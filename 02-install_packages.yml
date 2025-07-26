@@ -1,0 +1,21 @@
+---
+- name: Install packages
+  hosts: all
+  gather_facts: false
+  tasks: 
+  - name: Install containerd binary file
+    ansible.builtin.unarchive: 
+      src: "{{ CONTAINERD_PACKAGE_PATH }}"
+      dest: /usr/local/
+  - name: Install runc binary file
+    ansible.builtin.copy: 
+      src: "{{ RUNC_PACKAGES_PATH }}"
+      dest: /usr/local/sbin/runc
+      owner: root
+      group: root
+      mode: "0755"
+  - name: Install kubelet kubeadm kubectl
+    ansible.builtin.dnf: 
+      name: [ 'kubelet-{{ KUBERNETES_PACKAGES_VERSION }}', 'kubeadm-{{ KUBERNETES_PACKAGES_VERSION }}', 'kubectl-{{ KUBERNETES_PACKAGES_VERSION }}' ]
+      state: present
+      disable_excludes: kubernetes

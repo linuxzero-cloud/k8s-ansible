@@ -1,0 +1,27 @@
+[master]
+base-k8s-master-1 BOOTSTRAP=true
+
+[worker]
+base-k8s-worker-1
+base-k8s-worker-2
+
+
+[all:vars]
+ansible_ssh_user=root
+ansible_ssh_password=redhat
+KUBERNETES_VERSION=v1.31
+KUBERNETES_PACKAGES_VERSION=1.31.11
+
+KUBERNETES_BOOTSTRAP_ADDRESS=192.168.50.131
+KUBERNETES_BOOTSTRAP_HOSTNAME=base-k8s-master-1.example.com
+
+KUBERNETES_BOOTSTRAP_HOST=base-k8s-master-1
+
+CONTAINERD_PACKAGE_PATH=./packages/containerd-static-2.1.3-linux-amd64.tar.gz
+RUNC_PACKAGES_PATH=./packages/runc.amd64
+PAUSE_IMAGE_NAME=registry.k8s.io/pause:3.10
+
+HTTP_PROXY_CONF=HTTP_PROXY=socks5://192.168.50.199:10808
+HTTPS_PROXY_CONF=HTTPS_PROXY=socks5://192.168.50.199:10808
+NO_PROXY_CONF=NO_PROXY=localhost,127.0.0.1,.svc,192.168.50.0/24,.example.com,10.96.0.0/16,10.100.0.0/16,quay.io
+

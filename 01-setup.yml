@@ -1,0 +1,48 @@
+- name: System Initialization Configuration
+  hosts: all
+  gather_facts: false
+  module_defaults: 
+    ansible.builtin.copy: 
+      owner: root
+      group: root
+      mode: "0644"
+  tasks: 
+  - name: Disable SELinux
+    ansible.builtin.lineinfile: 
+      path: /etc/selinux/config
+      regexp: ^SELINUX=
+      line: SELINUX=permissive
+  - name: Disable firewalld
+    ansible.builtin.systemd: 
+      name: firewalld
+      enabled: false
+      state: stopped
+  - name: Add sysctl parameter
+    ansible.builtin.copy: 
+      src: ./files/sysctl_k8s.conf
+      dest: /etc/sysctl.d/10-sysctl_k8s.conf
+  - name: Add linux kernel modules
+    ansible.builtin.copy: 
+      src: ./files/modules_k8s.conf
+      dest: /etc/modules-load.d/modules_k8s.conf
+  - name: Add kubernetes yum_repository
+    ansible.builtin.yum_repository: 
+      name: kubernetes
+      description: kubernetes
+      baseurl: https://pkgs.k8s.io/core:/stable:/{{ KUBERNETES_VERSION }}/rpm/
+      enabled: true
+      gpgcheck: true
+      gpgkey: https://pkgs.k8s.io/core:/stable:/{{ KUBERNETES_VERSION }}/rpm/repodata/repomd.xml.key
+      exclude: kubelet kubeadm kubectl cri-tools kubernetes-cni
+  - name: Install packages
+    ansible.builtin.dnf: 
+      name: "{{ packages_list }}"
+      state: present
+    vars: 
+      packages_list: 
+      - tar
+      - jq
+      - ipvsadm
+  - name: Please reboot the system manually.
+    ansible.builtin.debug: 
+      msg: "{{ inventory_hostname }}: Please reboot the system manually."

@@ -1,0 +1,21 @@
+---
+- name: set proxy
+  hosts: all
+  gather_facts: false
+  tasks: 
+  - name: Create /etc/systemd/system/containerd.service.d
+    ansible.builtin.file: 
+      path: /etc/systemd/system/containerd.service.d
+      state: directory
+  - name: Set container proxy
+    ansible.builtin.template: 
+      src: ./templates/containerd_proxy.conf.j2
+      dest: /etc/systemd/system/containerd.service.d/containerd_proxy.conf
+  - name: Run systemctl daemon-reload
+    ansible.builtin.systemd: 
+      daemon_reload: true
+  - name: Restart container
+    ansible.builtin.systemd: 
+      name: containerd
+      state: restarted
+      enabled: true

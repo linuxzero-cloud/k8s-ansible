@@ -1,0 +1,6 @@
+artifact/
+logs/
+packages/
+ansible-navigator.yml
+ansible.cfg
+

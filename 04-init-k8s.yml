@@ -1,0 +1,75 @@
+---
+- name: Init K8S
+  hosts: all
+  gather_facts: false
+  tasks: 
+  - name: Block for init k8s bootstrap
+    block:
+    - name: Create kubeadm config
+      ansible.builtin.template: 
+        src: ./templates/kubeadm-init.yml.j2
+        dest: /root/kubeadm-init.yml
+    - name: Check bootstrap status
+      ansible.builtin.shell: "crictl --runtime-endpoint unix:///run/containerd/containerd.sock ps | grep kube-apiserver"
+      register: bootstrap_status
+      ignore_errors: true
+    - name: Init k8s
+      ansible.builtin.command: "kubeadm init --config /root/kubeadm-init.yml"
+      when: bootstrap_status.rc == 1
+    when: 
+    - BOOTSTRAP is defined
+    - BOOTSTRAP
+  - name: CHeck if /etc/profile.d/kubectl.sh exists
+    ansible.builtin.stat: 
+      path: /etc/profile.d/kubectl.sh
+    register: kubectl_bash_completion
+  - name: Create kubelet bash completion
+    ansible.builtin.shell: 
+      cmd: "kubectl completion bash > /etc/profile.d/kubectl.sh"
+    when: not kubectl_bash_completion.stat.exists
+  - name: Block for get kubeadm join worker command
+    block:
+    - name: Get join-token
+      ansible.builtin.command: "kubeadm token list -o jsonpath={.token}"
+      register: kubeadm_token
+      changed_when: false
+    - name: Get token-ca-cert-hash
+      ansible.builtin.shell: |
+        echo sha256:$(openssl x509 -in /etc/kubernetes/pki/ca.crt -noout -pubkey \
+            | openssl rsa -pubin -outform DER 2>/dev/null \
+            | openssl dgst -sha256 \
+            | awk '{print $2}')
+      register: kubeadm_token_ca_cert_hash
+      changed_when: false
+    - name: Set kubectl config
+      ansible.builtin.shell: 
+        cmd: | 
+          mkdir -p $HOME/.kube \
+          && sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config \
+          && sudo chown $(id -u):$(id -g) $HOME/.kube/config
+    - name: Save worker join command to /root/kubeadm-join-worker-command at bootstrap node 
+      ansible.builtin.shell: 
+        cmd: |
+          echo "kubeadm join {{ KUBERNETES_BOOTSTRAP_ADDRESS }}:6443 \
+          --token {{ kubeadm_token.stdout }} \
+          --discovery-token-ca-cert-hash {{ kubeadm_token_ca_cert_hash.stdout }}" > /root/kubeadm-join-worker-command
+    when: 
+    - BOOTSTRAP is defined
+    - BOOTSTRAP
+  - name: Block for worker join cluster
+    block:
+    - name: Check worker node status
+      ansible.builtin.shell: "crictl --runtime-endpoint unix:///run/containerd/containerd.sock ps | grep kube-proxy"
+      register: worker_node_status
+      ignore_errors: true
+      changed_when: false
+    - name: Get worker join command
+      ansible.builtin.command: "cat /root/kubeadm-join-worker-command"
+      delegate_to: "{{ KUBERNETES_BOOTSTRAP_HOST }}"
+      register: kubeadm_worker_join_command
+      changed_when: false
+      when: worker_node_status.rc == 1
+    - name: Join worker
+      ansible.builtin.command: "{{ kubeadm_worker_join_command.stdout }}"
+      when: worker_node_status.rc == 1
+    when: inventory_hostname in groups['worker']

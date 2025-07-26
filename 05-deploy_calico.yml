@@ -1,0 +1,15 @@
+- name: Deploy calico
+  hosts: master
+  gather_facts: false
+  tasks: 
+  - name: Block for deploy calico
+    block: 
+    - name: Copy calico yaml
+      ansible.builtin.copy: 
+        src: "./packages/calico.yaml"
+        dest: /root/calico.yaml
+    - name: Deploy calcio
+      ansible.builtin.command: "kubectl apply -f /root/calico.yaml"
+    when: 
+    - BOOTSTRAP is defined
+    - BOOTSTRAP
